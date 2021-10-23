@@ -19,34 +19,23 @@ Base = automap_base()
 Base.prepare(engine, reflect=True)
 Measurement = Base.classes.measurement
 Station = Base.classes.station
-
+session = Session(engine)
 
 # CREATE FLASK ROUTES
 ################################################################
 @app.route("/")
 # Home page.
 # Lists all routes that are available...
-def home():
-    homepageHTML = (
-        f"<h1>Welcome to the Hawaii Climate Analysis API!</h1>"
-        f"<h2>Available API Endpoints:</h2><br/>"
-
-        f"<h3>🌧 PRECIPITATION:</h3>"
-        f"<a href='/api/v1.0/precipitation'>/api/v1.0/precipitation</a><br/><br/><br/><br/>"
-
-        f"<h3>📡 STATIONS:</h3>"
-        f"<a href='/api/v1.0/stations'>/api/v1.0/stations</a><br/><br/><br/><br/>"
-        
-        f"<h3>🌡 TEMPERATURE OBSERVATIONS:</h3>"
-        f"<a href='/api/v1.0/tobs'>/api/v1.0/tobs</a><br/><br/><br/><br/>"
-
-        f"<h3>📆 SPECIFIED START DATE:</h3>"
-        f"/api/v1.0/temp/YYYY-MM-DD<br/><br/><br/><br/>"
-
-        f"<h3>📆 SPECIFIED START DATE & END DATE:</h3>"
-        f"/api/v1.0/temp/YYYY-MM-DD/YYYY-MM-DD"
-    )
-    return homepageHTML
+def welcome():
+    return(
+    '''
+    Welcome to the Climate Analysis API!
+    Available Routes:
+    /api/v1.0/precipitation
+    /api/v1.0/stations
+    /api/v1.0/tobs
+    /api/v1.0/temp/start/end
+    ''')
 
 
 ################################################################
@@ -66,7 +55,7 @@ def precipitation():
     session.close()
     precip = {date: prcp for date, prcp in precipitation}
     return jsonify(precip)
-    #return jsonify(precipitation_data)
+    
 
 
 ################################################################
@@ -81,47 +70,47 @@ def stations():
     stations = list(np.ravel(results))
     # Disconnect from database
     session.close()
-    return jsonify(stations=stations
-    #return jsonify(stations_list)
+    return jsonify(stations=stations)
+    #return jsonify(stations)
 
 
 ################################################################
 @app.route("/api/v1.0/tobs")
 # Query the dates and temperature observations of the most active station for the last year of data.
 # Return a JSON list of temperature observations (TOBS) for the previous year.
-     def tobs():
-#def temp_monthly():
+#def tobs():
+def temp_monthly():
     # Connect to database
-    filter(Measurement.station == 'USC00519281').\
-    filter(Measurement.date >= prev_year).all()
+    session = Session(engine)
+    prev_year = dt.date(2017, 8, 23) - dt.timedelta(days=365)
+    results = session.query(Measurement.tobs).\
+      filter(Measurement.station == 'USC00519281').\
+      filter(Measurement.date >= prev_year).all()
     temps = list(np.ravel(results))
-    
-   
     # Disconnect from database
     session.close()
-    return jsonify(tobs_data)
+    #return jsonify(tobs)
     return jsonify(temps=temps)
 
 
 ################################################################
 @app.route("/api/v1.0/temp/<start>")
-@app.route("/api/v1.0/temp/2017-06-01/2017-06-30")
+@app.route("/api/v1.0/temp/<start>/<end>")
 # Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range.
 # When given the start only, calculate `TMIN`, `TAVG`, and `TMAX` for all dates greater than and equal to the start date.
 # When given the start and the end date, calculate the `TMIN`, `TAVG`, and `TMAX` for dates between the start and end date inclusive.
-def start_and_end(start='YYYY-MM-DD', end='YYYY-MM-DD'):
+def stats(start=None, end=None):
     
     # Connect to database
     session = Session(engine)
 
     # YOUR JOB: DEFINE THE temps_filtered_by_date VARIABLE
     sel = [func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
-
     if not end:
         results = session.query(*sel).\
             filter(Measurement.date >= start).all()
         temps = list(np.ravel(results))
-        return jsonify(temps)
+        return jsonify(temps=temps)
 
     results = session.query(*sel).\
         filter(Measurement.date >= start).\
